@@ -1,7 +1,6 @@
 module.exports = function (env, db, userClient) {
   var express = require('express');
   var messina = require('messina')('webmaker-events-service-' + env.get('NODE_ENV'));
-  var WebmakerAuth = require('webmaker-auth');
   var routes = require('./routes');
 
   // Check required config
@@ -13,13 +12,20 @@ module.exports = function (env, db, userClient) {
   }
 
   var app = express();
-  var auth = new WebmakerAuth({
-    loginURL: env.get('LOGIN_URL'),
-    authLoginURL: env.get('LOGIN_URL_WITH_AUTH'),
-    secretKey: env.get('SESSION_SECRET'),
-    forceSSL: env.get('FORCE_SSL'),
-    domain: env.get('COOKIE_DOMAIN')
-  });
+
+  var cookieOptions = {
+    key: 'webmakerlogin',
+    secret: env.get('SESSION_SECRET'),
+    cookie: {
+      expires: false,
+      secure: env.get('FORCE_SSL')
+    },
+    proxy: true
+  };
+
+  if (env.get('COOKIE_DOMAIN')) {
+    cookieOptions.cookie.domain = env.get('COOKIE_DOMAIN');
+  }
 
   if (env.get('ENABLE_GELF_LOGS')) {
     messina.init();
@@ -31,8 +37,8 @@ module.exports = function (env, db, userClient) {
   app.use(express.json());
   app.use(express.urlencoded());
 
-  app.use(auth.cookieParser());
-  app.use(auth.cookieSession());
+  app.use(express.cookieParser());
+  app.use(express.cookieSession(cookieOptions));
 
   // Dev flag sets admin to true
   app.use(function (req, res, next) {
